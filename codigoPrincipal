@@ -59,7 +59,8 @@ def getImages(caminho, maximo, tipo):
     return np.asarray(imagens), np.asarray(labels)
 
 def cnn(treino, labelsTreino, teste, labelsTeste, teste_simples, labelsTeste_simples, tamanho, qtdLabels):
-    #MUDAR OS MODELOS DAQUI
+    #MUDAR OS MODELOS DAQUI -- CHANGE THE MODEL FROM HERE
+    
     model = models.Sequential()
     model.add(layers.Conv2D(32, (3, 3), activation='relu', input_shape=(tamanho, tamanho, 1)))
     model.add(layers.MaxPooling2D((2, 2)))
@@ -73,7 +74,8 @@ def cnn(treino, labelsTreino, teste, labelsTeste, teste_simples, labelsTeste_sim
     tf.config.run_functions_eagerly(True)
     model.compile(optimizer='adam', loss=tf.keras.losses.SparseCategoricalCrossentropy(), metrics=tf.keras.metrics.SparseCategoricalAccuracy())
     
-    #ATÉ AQUI
+    #ATÉ AQUI -- TO HERE
+    
     history = model.fit(treino, labelsTreino, epochs=50, validation_data=(teste, labelsTeste))
 
     test_loss, test_acc = model.evaluate(teste,  labelsTeste, verbose=2)
