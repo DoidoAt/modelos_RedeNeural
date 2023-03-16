@@ -1,0 +1,124 @@
+from cProfile import label
+from email.mime import image
+import tensorflow as tf
+from tensorflow import keras
+from keras import datasets, layers, models
+import datetime
+import os
+from xml.etree.ElementTree import tostring
+import PIL
+from PIL import Image, ImageFilter
+import glob
+import cv2
+import numpy as np
+import sys
+
+def clahe(img):
+    img = np.array(img)
+    clahe = cv2.createCLAHE(clipLimit=10)
+    img = clahe.apply(img)
+    img = Image.fromarray(img)
+    return img
+
+def preProcessa(caminho, maximo):
+    img = Image.open(caminho).convert('L')
+    img = img.resize((maximo), resample=Image.LANCZOS)
+    img = clahe(img)
+
+    return np.asarray(img)
+
+
+def getImages(caminho, maximo, tipo):
+    imagens = []
+    labels = []
+
+    for file in glob.glob(caminho):
+        img = preProcessa(file, maximo)
+
+        imagens.append(img)
+        if tipo == 0:
+          if "catarata" in file:
+              labels.append(0)
+          elif "glaucoma" in file:
+              labels.append(1)
+          elif "macular-deg" in file:
+              labels.append(2)
+          elif "miopia" in file:
+              labels.append(3)
+          elif "normal" in file:
+              labels.append(4)
+          else:
+              labels.append(5)
+
+        else:
+          if "normal" in file:
+            labels.append(0)
+          else:
+            labels.append(1)
+
+    return np.asarray(imagens), np.asarray(labels)
+
+def cnn(treino, labelsTreino, teste, labelsTeste, teste_simples, labelsTeste_simples, tamanho, qtdLabels):
+    #MUDAR OS MODELOS DAQUI
+    model = models.Sequential()
+    model.add(layers.Conv2D(32, (3, 3), activation='relu', input_shape=(tamanho, tamanho, 1)))
+    model.add(layers.MaxPooling2D((2, 2)))
+    model.add(layers.Conv2D(64, (3, 3), activation='relu'))
+    model.add(layers.MaxPooling2D((2, 2)))
+    model.add(layers.Conv2D(64, (3, 3), activation='relu'))
+    model.add(layers.Flatten())
+    model.add(layers.Dense(64, activation='relu'))
+    model.add(layers.Dense(qtdLabels, activation='softmax'))
+
+    tf.config.run_functions_eagerly(True)
+    model.compile(optimizer='adam', loss=tf.keras.losses.SparseCategoricalCrossentropy(), metrics=tf.keras.metrics.SparseCategoricalAccuracy())
+    
+    #ATÉ AQUI
+    history = model.fit(treino, labelsTreino, epochs=50, validation_data=(teste, labelsTeste))
+
+    test_loss, test_acc = model.evaluate(teste,  labelsTeste, verbose=2)
+
+    print(test_acc)
+
+
+    if qtdLabels == 2:
+
+      positivo = 0
+      falsoPositivo = 0
+      negativo = 0
+      falsoNegativo = 0
+      
+      tamanho = len(teste_simples)
+      for x in range(tamanho):
+        image = np.expand_dims(teste_simples[x], axis=0)
+ 
+        images = np.vstack([image])
+        
+
+        classes = model.predict(images)
+
+        if max(classes[0]) == classes[0][0]:
+          if labelsTeste_simples[x] == 0:
+            positivo+=1
+          else:
+            falsoPositivo+=1
+        else:
+          if labelsTeste_simples[x] != 0:
+            negativo+=1
+          else:
+            falsoNegativo+=1
+        
+      print(positivo, falsoPositivo, negativo, falsoNegativo)
+
+def comeca(qual):
+  maximo = (512,512)
+  tamanho = 512
+  treino, labelsTreino = getImages("drive/MyDrive/TCC/base/treino/*.jpg", maximo, qual)
+  teste, labelsTeste = getImages("drive/MyDrive/TCC/base/teste/*.jpg", maximo, qual)
+
+  if qual == 1:
+    teste_simples, labelsTeste_simples = getImages("drive/MyDrive/TCC/base/teste_simples/*.jpg", maximo, qual)
+    cnn(treino, labelsTreino, teste, labelsTeste, teste_simples, labelsTeste_simples, tamanho, 2)
+
+  else:
+    cnn(treino, labelsTreino, teste, labelsTeste, [], [], tamanho, 6)
